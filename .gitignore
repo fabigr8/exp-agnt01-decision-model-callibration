@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+CLAUDE.md
+
+# Project: local endpoint config (may reference private hosts) and downloaded archives
+configs/endpoints.yaml
+data/*
+!data/checksums.sha256

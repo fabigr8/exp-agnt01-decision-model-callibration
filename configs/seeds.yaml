@@ -1,0 +1,2 @@
+# Protocol 4.4: the only seed. Every random step derives its own seed from it (src/common.py: derive_seed).
+master_seed: 20261113

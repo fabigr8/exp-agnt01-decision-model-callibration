@@ -1,0 +1,5 @@
+# V1
+# id must match data/task_a/*.jsonl labels. Positive class = hallucinated (02, Terms).
+# Listed in O0 order; O1 = reversed.
+- {id: hallucinated, text: "Yes, it contains unsupported information"}
+- {id: supported,    text: "No, everything is supported by the passages"}

@@ -1,16 +1,24 @@
 # Hypotheses (frozen before any test-set run)
 
-Status: v1.0 proposed 13 Nov 2026. Any change after the freeze goes into the deviation log in `03_experiment_protocol.md`.
+Status: v2.0 draft, 13 Nov 2026 (structural revision; see `04_revision_plan.md`). Values marked **TBD** are set by the power simulation (plan step 4) and Phase 0, then confirmed by co-authors before the freeze. At the freeze, this file is uploaded to OSF and tagged in git (`03_experiment_protocol.md` section 10). Any change after the freeze goes into the deviation log in `03`.
 
-Numeric thresholds marked **[SESOI]** are smallest effects we consider practically meaningful. They are our a-priori choices, not derived from data. Confirm or adjust them before the pilot freeze.
+Thresholds marked **[SESOI]** are the smallest effects we consider practically meaningful. They are our a-priori choices, not derived from data. The proposed values are starting points for the power simulation.
 
 ## Terms
 
-- **Condition** c = (p, o): question paraphrase p in {P0..P5} and option order o. Canonical condition c0 = (P0, O0).
-- **Flip:** the top option (after mapping back to the original option identity) differs between two conditions for the same item. For binary tasks, the decision at 0.5 on P(positive).
-- **ECE:** 10 equal-width bins; on P(positive) for binary tasks, top-label for multi-class.
-- **Tasks:** A = binary factual check (RAGTruth QA subset); B = multi-class choice (MASSIVE scenario level). Primary model: d1-2B.
-- Intervals: 95% cluster bootstrap over item groups (source or prompt), 2,000 resamples, unless stated.
+- **Models.** The confirmatory model is d1-2B. The other decision models (vLLM-SR d3, AWS Strands Decider 2B) are core but descriptive: each one that passes the Phase 0 gate runs the full grid, and all H1-H6 statistics are reported for it (E8), without hypothesis tests. The LLM logprob baseline (`03` section 2.1) is likewise descriptive (E4). Neither enters the Holm family.
+- **Tasks.** A = binary factual check (RAGTruth QA subset); B = multi-class choice (MASSIVE en-US, scenario level).
+- **Task A polarity.** Positive class = hallucinated. The option texts and the mapping from model output to P(positive) are fixed in `prompts/` before the freeze.
+- **Condition** c = (p, o): question paraphrase p in {P0..P5} and option order o in {O0..O(k-1)}. Canonical condition c0 = (P0, O0). Outputs are always mapped back to the original option identity.
+- **Margin.** For multi-class: probability of the top option minus probability of the runner-up. For binary: |2 P(positive) - 1|.
+- **Noise floor ε.** ε = 2 × the maximum absolute probability difference observed in the Phase 0 determinism check. A difference of this size can come from numerical noise alone. **TBD (Phase 0).**
+- **Disagreement (flip).** Two conditions disagree on an item if their top options differ (binary: their decisions at 0.5 differ) **and** the margin exceeds ε in both conditions. Differences with a margin at or below ε are not counted.
+- **Log loss.** Mean negative natural-log probability of the true option, in nats per item; probabilities clipped to [1e-6, 1 - 1e-6].
+- **Brier score.** Binary: mean (p - y)². Multi-class: mean over items of the sum over options of (p_k - y_k)².
+- **ECE.** Descriptive only: reliability diagrams and debiased ECE (equal-width and equal-mass bins). It is not used in any confirmatory test.
+- **Groups.** Task A: `source_id`. Task B: each utterance is its own group.
+- **Intervals.** 95% cluster bootstrap over groups, 2,000 resamples, percentile intervals. All comparisons between conditions or methods are **paired**: they use the same resampled items. If a statistic involves fitting a calibrator, the calibration pool is resampled too and the calibrator is refitted in every resample.
+- **Bootstrap p-value.** For a test of "θ ≥ s": p = (1 + #{θ* < s}) / (1 + 2,000), where θ* are the bootstrap replicates and s is the SESOI. For a non-inferiority test of "θ < δ": p = (1 + #{θ* ≥ δ}) / (1 + 2,000).
 
 ## Research questions
 
@@ -19,69 +27,93 @@ Numeric thresholds marked **[SESOI]** are smallest effects we consider practical
 - RQ3: Does a calibrator transfer across wordings and orders, and how many labels does it need?
 - RQ4: Can ensembling and cost-based thresholds make the decisions more reliable and cheaper?
 
+## Primary tests
+
+Exactly one primary test per hypothesis. The six are corrected together with **Holm** at family-wise α = 0.05.
+
+| ID | Task | Statistic θ | Supported if | SESOI / margin (proposal) |
+|---|---|---|---|---|
+| H1 | A | Log-loss gain from Platt scaling at c0 | Holm-adjusted p ≤ 0.05 for θ ≥ s | s = **TBD** (proposal 0.01 nats) |
+| H2 | B | Pairwise disagreement across P0..P5 at O0 | Holm-adjusted p ≤ 0.05 for θ ≥ s | s = **TBD** (proposal 0.02) |
+| H3 | B | Transfer gap in log loss (paraphrase transfer matrix, temperature scaling) | Holm-adjusted p ≤ 0.05 for θ ≥ s | s = **TBD** (proposal 0.01 nats) |
+| H4 | A | Share of the full-pool Platt gain reached with n = 200 labels | Holm-adjusted p ≤ 0.05 for θ ≥ s | s = **TBD** (proposal 0.8) |
+| H5 | B | Brier(ensemble) - Brier(single c0), both calibrated | Holm-adjusted p ≤ 0.05 for θ < δ | δ = **TBD** (proposal 0.005) |
+| H6 | A | Mean expected-cost saving of calibrated over raw cost-derived thresholds, averaged over the cost grid | Holm-adjusted p ≤ 0.05 for θ ≥ s | s = **TBD** (proposal 0.005 cost units per item) |
+
+**Verdicts.** Each primary test has exactly one of three outcomes:
+- **Supported:** the condition in the table holds.
+- **Refuted:** the 95% interval lies entirely on the wrong side of the threshold. For H1-H4 and H6, the upper bound is below s. For H5, the lower bound is at or above δ.
+- **Inconclusive:** anything else. Inconclusive results are reported as such, with the interval.
+
+All secondary tests use unadjusted 95% intervals and are labelled "secondary" wherever they are reported.
+
 ## Confirmatory hypotheses
 
-### H1: Raw probabilities are miscalibrated, and the degree depends on the task (RQ1)
+### H1: Raw probabilities are miscalibrated (RQ1)
 
-- **Statement:** at the canonical condition, raw ECE on the test set is above 0.05 for at least one of tasks A and B, and raw ECE differs between A and B.
-- **Test:** lower bound of the ECE interval above 0.05 for at least one task; interval of the difference ECE_A minus ECE_B excludes 0. **[SESOI: 0.05]**
-- **Supported if** both conditions hold. **Not supported if** both tasks have the ECE interval upper bound below 0.05 (the model is already well calibrated here, which is itself a result).
-- **Why:** calibration is measured per task and per wording; "trained for calibration" is not a guarantee on our data.
+- **Primary (task A, c0):** fit Platt scaling on the full calibration pool at c0. θ = log loss(raw) - log loss(Platt) on test at c0. A positive gain on held-out data means the raw probabilities can be improved by a monotone recalibration, i.e. they are miscalibrated.
+- **Secondary:** the same on task B with temperature scaling; the same with Brier instead of log loss.
+- **Descriptive:** reliability diagrams and debiased ECE for A and B. The difference between A and B is not tested, because the binary and top-label views of calibration are not comparable.
+- **Why:** calibration is measured per task and per wording; being "trained for calibration" is no guarantee on our data.
 
-### H2: Decisions are not invariant to wording and order (RQ2)
+### H2: Decisions are not invariant to wording (RQ2)
 
-- **H2a (paraphrase):** with option order fixed at O0, the pairwise disagreement rate across paraphrases P0..P5 is at least 2% on the test set, on task A or B. **[SESOI: 2%]**
-- **H2b (order):** with paraphrase fixed at P0, the pairwise disagreement rate across option orders is at least 2%, on task A or B. **[SESOI: 2%]**
-  - Note: if the d1 model card shows that options are processed as an unordered set by design, a rate indistinguishable from numerical noise (see determinism check) is the expected result and counts as a verified property, not a failure of the study. H2b is then reported separately for each model.
-- **H2c (confident flips):** among items with canonical top-class probability of at least 0.9, the flip rate versus the canonical condition (over all other conditions) is at least 0.5%. **[SESOI: 0.5%]**
-- **Test:** lower bound of each interval at or above its threshold.
-- **Supported if** the lower bound is at or above the threshold. **Refuted if** the upper bound is below it.
+- **Primary (task B):** θ = mean over test items of the share of the 15 paraphrase pairs (P0..P5 at O0) that disagree, using the disagreement rule above.
+- **Secondary:**
+  - H2a-A: the same on task A.
+  - H2b: pairwise disagreement across option orders at P0, on A and B. If the d1 model card states that options are processed as an unordered set, disagreement at or below the noise floor is the expected result and is reported as a verified property.
+  - H2c: among items with canonical top-option probability ≥ 0.9, the flip rate versus c0 over all other conditions (proposal threshold 0.005).
 - **Why:** a calibrated probability is only trustworthy if the answer does not depend on incidental wording.
 
-### H3: Calibration does not fully transfer across conditions (RQ3)
+### H3: Calibration does not fully transfer across wordings (RQ3)
 
-- **Statement:** a calibrator (temperature scaling; Platt as robustness check) fitted on the canonical condition on the calibration pool gives higher test ECE at non-canonical conditions than at the canonical condition.
-- **H3a (paraphrase):** mean ECE over P1..P5 (order O0) minus ECE at c0 is at least 0.01. **[SESOI: 0.01]**
-- **H3b (order):** mean ECE over O1..O(k-1) (paraphrase P0) minus ECE at c0 is at least 0.01.
-- **H3c (pooled calibrator):** a calibrator fitted on pooled conditions closes at least half of the gap in H3a and H3b, measured on non-canonical test conditions. This is a secondary, directional test.
-- **Test:** interval of each difference; lower bound at or above 0.01 for H3a/H3b.
+- **Primary (task B, temperature scaling, order O0):** for each paraphrase i, fit a calibrator on the calibration pool at (P_i, O0). Evaluate it on the test set at every (P_j, O0). This gives a 6 × 6 matrix L[i, j] of test log loss. θ = mean of the off-diagonal entries (i ≠ j) minus mean of the diagonal entries. No single wording is privileged.
+- **Secondary:**
+  - H3-order: the same transfer matrix over the option orders at P0.
+  - H3-A: the paraphrase matrix on task A (Platt scaling).
+  - H3-Platt: the primary analysis with Platt scaling on top-label confidence.
+  - **H3c (leave-one-condition-out):** for each paraphrase j, fit one calibrator on the calibration pool pooled over all other paraphrases, and evaluate it on the test set at P_j. Closing share = (off-diagonal mean - leave-one-out mean) / (off-diagonal mean - diagonal mean). Supported if the closing share is ≥ 0.5 and the interval of (off-diagonal mean - leave-one-out mean) lies above 0. This tests transfer to a wording the calibrator has never seen.
 - **Why:** if consistency fails, a calibrator fitted on one phrasing describes only that phrasing.
 
-### H4: Recalibration helps, and non-parametric methods need more labels (RQ3)
+### H4: A small label budget recovers most of the recalibration gain (RQ3)
 
-- **H4a:** on any task where raw ECE exceeds 0.05, temperature scaling or Platt scaling fitted on n = 200 canonical-condition labels reduces test ECE by at least 30% relative to raw (mean over 200 resamples). **[SESOI: 30%]**
-- **H4b:** at n = 50, mean test ECE after isotonic regression is higher than after temperature scaling (paired by resample; interval excludes 0), and isotonic harms (ECE above raw) in a larger share of resamples than temperature scaling.
-- **Supported if** both parts hold. If the model is already calibrated (H1 not supported), H4a is reported as not testable.
-- **Why:** parametric methods have few parameters; isotonic regression fits a step function and needs more data.
+- **Primary (task A, Platt, c0):** θ = mean over calibration subsets of [log loss(raw) - log loss(Platt fitted on n = 200)] divided by [log loss(raw) - log loss(Platt fitted on the full pool)], on test. Each of the 2,000 bootstrap replicates draws one random subset of n = 200 from the calibration pool (stratified to keep the pool's prevalence) and one cluster bootstrap of the test set.
+- **Testable only if** H1 is supported. Otherwise the denominator is near 0 and H4 is reported as not testable.
+- **Secondary:**
+  - Learning curves for temperature, Platt and isotonic at n ∈ {25, 50, 100, 200, 400} on A and B.
+  - **H4b (replication of a known result):** at n = 50, isotonic regression gives higher test log loss than temperature or Platt scaling (paired), and it does worse than raw in a larger share of subsets.
+- **Why:** practitioners need to know how many labels to collect.
 
-### H5: Averaging over perturbations improves consistency without hurting calibration (RQ4)
+### H5: Averaging over perturbations does not hurt calibration (RQ4)
 
-- **Statement:** averaging probabilities over all conditions of the grid (the "full ensemble") compared with a single canonical call:
-  - **H5a:** cuts split-half disagreement by at least 50% relative. Split-half disagreement = flip rate between two ensembles built from disjoint random halves of the conditions. For the single-call baseline, the rate between two randomly chosen single conditions. **[SESOI: 50%]**
-  - **H5b:** after calibration with the same method and label budget, the ensemble's test Brier score is not higher than the single call's (paired bootstrap; difference interval does not exclude zero in the wrong direction).
-- **Why:** ensembling is a cheap fix, and decision models are fast, so K calls per item are affordable.
+- **Primary (task B, non-inferiority):** the ensemble is the mean of the probabilities over all 36 conditions. The ensemble and the single call at c0 are each calibrated with temperature scaling on the full calibration pool, using the same procedure. θ = Brier(ensemble) - Brier(single), on test.
+- **Secondary:** the same on task A (12 conditions); log loss instead of Brier.
+- **Descriptive (replaces old H5a):** split-half disagreement as a function of ensemble size K ∈ {1, 2, 3, 6, half of all conditions}, from 200 random draws of two disjoint sets of K conditions per K. Lower disagreement at larger K is expected by construction. The curve shows how fast it falls, which tells practitioners how many calls are enough.
+- **Why:** ensembling is a cheap fix for inconsistency, but only if it does not cost calibration.
 
-### H6: Cost-derived thresholds beat default rules, but only on calibrated probabilities (RQ4)
+### H6: Calibration pays off in cost-based decisions (RQ4)
 
-- **Setting:** binary task A (and D if included). Cost grid: c_false_block = 1; c_miss in {2, 5, 10, 25}; c_review in {0.1, 0.25, 0.5}; review treated as always correct. Cells where the lower cut-off exceeds the upper one use the single-threshold rule from the protocol.
-- **H6a:** on calibrated probabilities, cost-derived thresholds give lower expected test cost than the default rules (single threshold 0.5; band 0.2/0.8) in more than half of the grid cells (interval excludes 0).
-- **H6b:** cost-derived thresholds computed on calibrated probabilities give lower expected test cost than the same formulas applied to raw probabilities in more than half of the cells.
-- **Why:** the formula assumes the probabilities mean what they say; this is where calibration should pay off.
+- **Setting:** task A. Cost grid: c_false_block = 1; c_miss ∈ {2, 5, 10, 25}; c_review ∈ {0.1, 0.25, 0.5}; review is assumed always correct. Threshold formulas are in `03` section 9.
+- **Primary:** θ = mean over the 12 grid cells of [expected test cost per item using the formulas on raw probabilities - the same using Platt-calibrated probabilities]. The calibrator is the same one as in H1 (full calibration pool, c0). One statistic, one bootstrap, so the correlation between cells is handled.
+- **Key secondary:** calibrated formula versus empirical cost-minimising thresholds searched on the calibration pool. This is reported as a difference with interval, and it shows whether calibration adds anything over direct tuning.
+- **Descriptive:** comparison with the default rules (0.5; band 0.2/0.8), per cell.
+- **Why:** the threshold formulas assume that probabilities mean what they say; this is where calibration should pay off.
 
 ## Exploratory analyses (reported as exploratory, no thresholds)
 
 - **E1 Position bias:** accuracy by position of the correct option; share of probability mass by slot.
-- **E2 Variance decomposition:** share of within-item variance of the top-class logit attributable to paraphrase, order, their interaction and residual.
+- **E2 Variance decomposition:** within-item variance of the log-odds of the canonical top option, split into paraphrase, order, and "interaction + residual". The last two cannot be separated, because there is one observation per cell.
 - **E3 Option-label wording (task B):** descriptive versus short scenario names as a third factor.
-- **E4 Other models:** vLLM-SR d3 and AWS Strands Decider 2B, only if they pass the feasibility gate; descriptive comparison, no ranking claims.
-- **E5 Ordinal task C (HelpSteer2):** helpfulness as a five-level choice, expected-level calibration.
-- **E6 Rare class D (ToxicChat jailbreaking):** H6 repeated, with wide intervals expected (about 100 positives per half).
-- **E7 Inconsistency versus miscalibration:** whether items that flip are also the miscalibrated ones (flip rate by confidence bin).
+- **E4 LLM logprob baseline:** the full grid and all statistics of H1-H6 for the baseline, reported side by side with d1-2B. Descriptive; no tests and no ranking claims.
+- **E5 Ordinal task C (HelpSteer2):** helpfulness as a five-level choice; calibration of the expected level.
+- **E6 Rare class D (ToxicChat `jailbreaking`):** H6 repeated, with wide intervals expected (about 100 positives per half).
+- **E7 Inconsistency versus miscalibration:** whether the items that flip are also the miscalibrated ones (flip rate by confidence bin).
+- **E8 Other decision models (core, descriptive):** vLLM-SR d3 and AWS Strands Decider 2B. Every model that passes the Phase 0 gate runs the full grid on A and B. All H1-H6 statistics, with intervals, are reported per model next to d1-2B. No tests, no ranking claims. A model that does not expose per-option probabilities is reported as excluded, with the reason.
 
 ## Analysis rules
 
-- **Primary model and tasks:** d1-2B on A and B. Everything else is exploratory.
-- **Multiplicity:** 95% intervals are reported per test without adjustment; because there are six hypotheses on two tasks, borderline results are described as such, and all tests are reported whether or not they succeed.
+- **Confirmatory scope:** d1-2B, the six primary tests above. Other decision models (E8) and the baseline (E4) get the same statistics, descriptively. Everything else is secondary or exploratory and labelled as such.
+- **Multiplicity:** Holm across the six primary tests. Secondary tests use unadjusted intervals and are never used to rescue a primary verdict.
 - **Null results:** reported in full. A well-calibrated or order-invariant model is a legitimate finding.
-- **No peeking:** test-set predictions are generated once, after the freeze; the dev set is used for pilots.
-- **Deviation log:** any change after the freeze, with date and reason, goes into the protocol.
+- **No peeking:** test-set predictions are generated once, after the freeze. The dev set is for pilots only.
+- **Deviation log:** any change after the freeze, with date and reason, goes into `03` section 10.

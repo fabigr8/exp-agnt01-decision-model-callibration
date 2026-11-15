@@ -1,0 +1,21 @@
+# V1
+# id = MASSIVE scenario label (must match data/task_b/*.jsonl); text = what the model sees.
+# Listed in O0 order = alphabetical by text (see protocol 4.2).
+- {id: alarm,          text: "Alarms"}
+- {id: calendar,       text: "Calendar and reminders"}
+- {id: cooking,        text: "Cooking and recipes"}
+- {id: datetime,       text: "Date and time"}
+- {id: audio,          text: "Device volume and audio settings"}
+- {id: email,          text: "Email"}
+- {id: takeaway,       text: "Food delivery and takeaway"}
+- {id: general,        text: "General conversation"}
+- {id: qa,             text: "General knowledge questions"}
+- {id: lists,          text: "Lists"}
+- {id: music,          text: "Music information and preferences"}
+- {id: news,           text: "News"}
+- {id: play,           text: "Playing media (music, radio, podcasts, audiobooks)"}
+- {id: recommendation, text: "Recommendations (places, events, movies)"}
+- {id: iot,            text: "Smart home devices"}
+- {id: social,         text: "Social media"}
+- {id: transport,      text: "Transport and travel"}
+- {id: weather,        text: "Weather"}

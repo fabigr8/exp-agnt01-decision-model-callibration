@@ -1,0 +1,28 @@
+# Pinned dataset sources (protocol section 4). sha256: null means "not pinned yet";
+# prep_data.py then prints the downloaded file's hash and stops until it is pinned here.
+
+massive:                       # task B, MASSIVE 1.1, licence CC BY 4.0
+  url: https://amazon-massive-nlu-dataset.s3.amazonaws.com/amazon-massive-dataset-1.1.tar.gz
+  sha256: 4cba5faa11c71437928e17cb1b9b3d8b8e727e7ea363a3a9a8045e19c0491577
+  member_suffix: data/en-US.jsonl
+  calib_size: 1000
+  drop_scenarios: []           # Phase 0 decision (16 vs 18 options)
+
+ragtruth:                      # task A
+  approved: true               # set true only after DPO and Legal clearance (protocol section 15)
+  repo: ParticleMedia/RAGTruth
+  commit: c103204b9ce28d6bbad859304bf30de72b8ed8fe  # pinned 15 Nov 2026
+  responses_path: dataset/response.jsonl
+  responses_sha256: e4c2e4ac24fff676d8984cc61c35d791612fadc58015335d97dd632375e18073
+  sources_path: dataset/source_info.jsonl
+  sources_sha256: 0dffc26ea9f3c1c3d7c7e8336b56ef1646e3cec876edffcca3c9c624d12d578b
+  task_type: QA
+  keep_quality: [good]         # verify field values in Phase 0
+  token_cap: null              # TBD after Phase 0 (target 1000)
+  tokenizer: null              # d1-2B tokenizer, needed once token_cap is set
+  tokenizer_revision: null
+  dev_share: 0.10
+  min_official_test: 1500
+  calib_size: 1000
+  calib_size_fallback: 500
+  min_test: 1000

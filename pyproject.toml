@@ -1,0 +1,24 @@
+[project]
+name = "decision-model-calibration"
+version = "0.1.0"
+description = "Experiments for the paper on calibration and consistency of decision models"
+requires-python = "==3.13.*"
+dependencies = [
+    "numpy",
+    "pyyaml",
+    "openai",
+    "truststore",
+]
+
+[project.optional-dependencies]
+hf = ["transformers"]   # tokenizer for the RAGTruth token cap; d1 backend dependencies added in Phase 0
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

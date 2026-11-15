@@ -1,0 +1,6 @@
+# Copy to configs/endpoints.yaml (git-ignored) and fill in. Never put the API key itself in this file.
+base_url: http://localhost:8000/v1   # OpenAI-compatible server; self-hosted vLLM recommended (protocol 2.1)
+model: TBD                           # served model name; pin its revision on the server side
+api_key_env: BASELINE_API_KEY        # name of the environment variable that holds the key
+top_logprobs: 20                     # task B needs >= number of options
+timeout_s: 60

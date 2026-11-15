@@ -1,0 +1,11 @@
+# Example run config for src/run_grid.py. Copy, adjust, and keep the copies used for real runs in configs/.
+model: baseline              # name used in output paths
+backend: openai_compat       # openai_compat | d1 (d3 and Strands added after Phase 0)
+endpoint: configs/endpoints.yaml
+revision: null               # model revision; for endpoints the served model name is stored in results/raw
+task: B
+split: dev
+limit: 5                     # pilot: first n items only; remove for full runs
+paraphrases: null            # null = all in prompts/task_<x>/paraphrases.yaml
+orders: null                 # null = all orders
+batch_size: 32

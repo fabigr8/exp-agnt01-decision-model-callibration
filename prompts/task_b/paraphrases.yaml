@@ -1,0 +1,3 @@
+# DRAFT (13 Nov 2026), proposed by Claude, to be reviewed and approved by the authors before any model run.
+# P0 = canonical question (protocol 4.5). P1-P5 are added later from LLM candidates, after two-author review.
+P0: "A user said the following. Which topic does the request belong to?"
